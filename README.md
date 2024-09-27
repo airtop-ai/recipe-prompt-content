@@ -1,4 +1,4 @@
-# airtop-recipe-template
+# Recipe: Authenticate and scrape website using a prompt with Airtop
 
 ## Overview
 
