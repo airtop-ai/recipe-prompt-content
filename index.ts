@@ -6,13 +6,51 @@ import chalk from 'chalk';
 const AIRTOP_API_KEY = process.env.AIRTOP_API_KEY;
 const LOGIN_URL = 'https://www.glassdoor.com/profile/login_input.htm';
 const TARGET_URL = 'https://www.glassdoor.com/Job/san-francisco-ca-software-engineer-jobs-SRCH_IL.0,16_IC1147401_KO17,34.htm'; // A search for software engineer jobs on Glassdoor
-const PROMPT = `This browser is open to a page that lists available job roles for software engineers in San Francisco. Please list 10 job roles that appear to be posted by the AI-related companies.
+const PROMPT = `This browser is open to a page that lists available job roles for software engineers in San Francisco. Please provide 10 job roles that appear to be posted by the AI-related companies.
 
-Return your response in the following format:
+Report your results using the JSON schema below. If you cannot fulfill the request, use the "error" field in the schema to report the problem.
 
-1. Company Name: Company A, Location: San Francisco, Salary: $100,000 - $120,000
-2. Company Name: Company B, Location: San Francisco, Salary: $110,000 - $130,000
-3. Company Name: Company C, Location: San Francisco, Salary: $95,000 - $115,000`;
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "companies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "companyName": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "salary": {
+            "type": "object",
+            "properties": {
+              "min": {
+                "type": "number",
+                "minimum": 0
+              },
+              "max": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": ["min", "max"]
+          }
+        },
+        "required": ["companyName", "location", "salary"]
+      }
+    },
+    "error": {
+      "type": "string",
+      "description": "Error message in case of failure"
+    },
+  },
+  "required": ["companies"]
+}
+`;
 
 async function run() {
   try {
