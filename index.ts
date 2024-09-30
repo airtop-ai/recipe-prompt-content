@@ -46,9 +46,8 @@ Report your results using the JSON schema below. If you cannot fulfill the reque
     "error": {
       "type": "string",
       "description": "Error message in case of failure"
-    },
-  },
-  "required": ["companies"]
+    }
+  }
 }
 `;
 
