@@ -5,7 +5,24 @@ import chalk from 'chalk';
 
 const AIRTOP_API_KEY = process.env.AIRTOP_API_KEY;
 const LOGIN_URL = 'https://www.glassdoor.com/member/profile';
-const IS_LOGGED_IN_PROMPT = `This browser is open to a page that either display's a user's Glassdoor profile or prompts the user to login.  Please respond with a boolean value (true or false) depending on whether you can determine that the user is logged in.`;
+const IS_LOGGED_IN_PROMPT = `This browser is open to a page that either display's a user's Glassdoor profile or prompts the user to login.  Please give me a JSON response matching the schema below.
+
+Use the "isLoggedIn" field to indicate whether the user is logged in. If you cannot fulfill the request, use the "error" field in the schema to report the problem.
+
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "isLoggedIn": {
+      "type": "boolean",
+    },
+    "error": {
+      "type": "string",
+      "description": "Error message in case of failure"
+    }
+  }
+}
+`;
 const TARGET_URL = 'https://www.glassdoor.com/Job/san-francisco-ca-software-engineer-jobs-SRCH_IL.0,16_IC1147401_KO17,34.htm'; // A search for software engineer jobs on Glassdoor
 const EXTRACT_DATA_PROMPT = `This browser is open to a page that lists available job roles for software engineers in San Francisco. Please provide 10 job roles that appear to be posted by the AI-related companies.
 
@@ -109,7 +126,11 @@ async function run() {
     const isLoggedInPromptResponse = await client.windows.promptContent(session.id, windowInfo.data.windowId, {
       prompt: IS_LOGGED_IN_PROMPT,
     });
-    const isUserLoggedIn = isLoggedInPromptResponse.data.modelResponse.trim().toLowerCase() === 'true';
+    const parsedResponse = JSON.parse(isLoggedInPromptResponse.data.modelResponse);
+    if (parsedResponse.error) {
+      throw new Error(parsedResponse.error);
+    }
+    const isUserLoggedIn = parsedResponse.isLoggedIn;
 
     // Prompt the user to log in if they are not logged in already
     if (!isUserLoggedIn) {
