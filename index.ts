@@ -4,9 +4,10 @@ import { AirtopClient, AirtopError } from '@airtop/sdk';
 import chalk from 'chalk';
 
 const AIRTOP_API_KEY = process.env.AIRTOP_API_KEY;
-const LOGIN_URL = 'https://www.glassdoor.com/profile/login_input.htm';
+const LOGIN_URL = 'https://www.glassdoor.com/member/profile';
+const IS_LOGGED_IN_PROMPT = `This browser is open to a page that either display's a user's Glassdoor profile or prompts the user to login.  Please respond with a boolean value (true or false) depending on whether you can determine that the user is logged in.`;
 const TARGET_URL = 'https://www.glassdoor.com/Job/san-francisco-ca-software-engineer-jobs-SRCH_IL.0,16_IC1147401_KO17,34.htm'; // A search for software engineer jobs on Glassdoor
-const PROMPT = `This browser is open to a page that lists available job roles for software engineers in San Francisco. Please provide 10 job roles that appear to be posted by the AI-related companies.
+const EXTRACT_DATA_PROMPT = `This browser is open to a page that lists available job roles for software engineers in San Francisco. Please provide 10 job roles that appear to be posted by the AI-related companies.
 
 Report your results using the JSON schema below. If you cannot fulfill the request, use the "error" field in the schema to report the problem.
 
@@ -20,6 +21,9 @@ Report your results using the JSON schema below. If you cannot fulfill the reque
         "type": "object",
         "properties": {
           "companyName": {
+            "type": "string"
+          },
+          jobTitle: {
             "type": "string"
           },
           "location": {
@@ -40,7 +44,7 @@ Report your results using the JSON schema below. If you cannot fulfill the reque
             "required": ["min", "max"]
           }
         },
-        "required": ["companyName", "location", "salary"]
+        "required": ["companyName", "jobTitle", "location", "salary"]
       }
     },
     "error": {
@@ -56,9 +60,19 @@ async function run() {
     const client = new AirtopClient({
       apiKey: AIRTOP_API_KEY,
     });
+    const profileId: string | undefined = await new Promise<string | undefined>((resolve) => {
+      process.stdout.write('Enter a profileId (or press Enter to skip): ');
+      process.stdin.once('data', (input) => {
+        const trimmedInput = input.toString().trim();
+        resolve(trimmedInput || undefined);
+        console.log(trimmedInput ? `Using profileId: ${trimmedInput}` : 'No profileId provided');
+      });
+    });
     const createSessionResponse = await client.sessions.create({
       configuration: {
         timeoutMinutes: 10,
+        persistProfile: true,
+        baseProfileId: profileId,
       },
     });
 
@@ -82,24 +96,40 @@ async function run() {
     // Open a new page
     const page: Page = await browser.newPage();
 
-    // Allow user to login so that they can access communities that might require authentication
-    console.log('Navigating to login page');
+    console.log('Navigating to Glassdoor profile');
     await page.goto(LOGIN_URL);
     const windowInfo = await client.windows.getWindowInfoForPuppeteerPage(session, page, {
-      disableResize: true, // Prevents the browser window from resizing when a live view is loaded, in case scraping is dependent on what is inside the the visible window
+    // By default, Airtop resizes a live view to match the user's local browser window size.
+    // This might affect Airtop's scraping mechanism, so we disable that behavior here.
+      disableResize: true,
     }); 
-    console.log('Log into your Glassdoor account on the live view of your browser window.  Press `Enter` once you have logged in.', chalk.blueBright(windowInfo.data.liveViewUrl));
-    await new Promise<void>(resolve => process.stdin.once('data', () => resolve()));
+
+    // Check whether the user is logged in
+    console.log('Determining whether the user is logged in...');
+    const isLoggedInPromptResponse = await client.windows.promptContent(session.id, windowInfo.data.windowId, {
+      prompt: IS_LOGGED_IN_PROMPT,
+    });
+    const isUserLoggedIn = isLoggedInPromptResponse.data.modelResponse.trim().toLowerCase() === 'true';
+
+    // Prompt the user to log in if they are not logged in already
+    if (!isUserLoggedIn) {
+      console.log('Log into your Glassdoor account on the live view of your browser window.  Press `Enter` once you have logged in.', chalk.blueBright(windowInfo.data.liveViewUrl), isUserLoggedIn);
+      await new Promise<void>(resolve => process.stdin.once('data', () => resolve()));
+      console.log('To avoid logging in again, use the following profileId the next time you run this script: ', chalk.green(session.profileId));
+    } else {
+      console.log('User is logged in. Live view URL:', chalk.blueBright(windowInfo.data.liveViewUrl));
+    }
 
     // Navigate to the target URL
-    console.log('Navigating to target URL');
+    console.log('Navigating to target url');
     await page.goto(TARGET_URL);
     console.log('Prompting the AI agent, waiting for a response (this may take a few minutes)...');
     const promptContentResponse = await client.windows.promptContent(session.id, windowInfo.data.windowId, {
-      prompt: PROMPT,
+      prompt: EXTRACT_DATA_PROMPT,
       followPaginationLinks: true, // This will tell the agent to load additional results via pagination links or scrolling
     });
-    console.log('Response:\n\n', chalk.green(promptContentResponse.data.modelResponse));
+    const formattedJson = JSON.stringify(JSON.parse(promptContentResponse.data.modelResponse), null, 2);
+    console.log('Response:\n\n', chalk.green(formattedJson));
 
     // Clean up
     await browser.close();
