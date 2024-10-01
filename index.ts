@@ -7,18 +7,17 @@ const AIRTOP_API_KEY = process.env.AIRTOP_API_KEY;
 const LOGIN_URL = 'https://www.glassdoor.com/member/profile';
 const IS_LOGGED_IN_PROMPT = `This browser is open to a page that either display's a user's Glassdoor profile or prompts the user to login.  Please give me a JSON response matching the schema below.
 
-Use the "isLoggedIn" field to indicate whether the user is logged in. If you cannot fulfill the request, use the "error" field in the schema to report the problem.
-
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
     "isLoggedIn": {
       "type": "boolean",
+      "description": "Use this field to indicate whether the user is logged in."
     },
     "error": {
       "type": "string",
-      "description": "Error message in case of failure"
+      "description": "If you cannot fulfill the request, use this field to report the problem."
     }
   }
 }
@@ -26,7 +25,7 @@ Use the "isLoggedIn" field to indicate whether the user is logged in. If you can
 const TARGET_URL = 'https://www.glassdoor.com/Job/san-francisco-ca-software-engineer-jobs-SRCH_IL.0,16_IC1147401_KO17,34.htm'; // A search for software engineer jobs on Glassdoor
 const EXTRACT_DATA_PROMPT = `This browser is open to a page that lists available job roles for software engineers in San Francisco. Please provide 10 job roles that appear to be posted by the AI-related companies.
 
-Report your results using the JSON schema below. If you cannot fulfill the request, use the "error" field in the schema to report the problem.
+Report your results using the JSON schema below.
 
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
@@ -66,7 +65,7 @@ Report your results using the JSON schema below. If you cannot fulfill the reque
     },
     "error": {
       "type": "string",
-      "description": "Error message in case of failure"
+      "description": "If you cannot fulfill the request, use this field to report the problem."
     }
   }
 }
@@ -134,11 +133,11 @@ async function run() {
 
     // Prompt the user to log in if they are not logged in already
     if (!isUserLoggedIn) {
-      console.log('Log into your Glassdoor account on the live view of your browser window.  Press `Enter` once you have logged in.', chalk.blueBright(windowInfo.data.liveViewUrl), isUserLoggedIn);
+      console.log('Log into your Glassdoor account on the live view of your browser window.  Press `Enter` once you have logged in.', chalk.blueBright(windowInfo.data.liveViewUrl));
       await new Promise<void>(resolve => process.stdin.once('data', () => resolve()));
       console.log('To avoid logging in again, use the following profileId the next time you run this script: ', chalk.green(session.profileId));
     } else {
-      console.log('User is logged in. Live view URL:', chalk.blueBright(windowInfo.data.liveViewUrl));
+      console.log('User is already logged in. View progress at the following live view URL:', chalk.blueBright(windowInfo.data.liveViewUrl));
     }
 
     // Navigate to the target URL
