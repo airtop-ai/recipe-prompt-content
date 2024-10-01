@@ -87,7 +87,7 @@ async function run() {
     const createSessionResponse = await client.sessions.create({
       configuration: {
         timeoutMinutes: 10,
-        persistProfile: true,
+        persistProfile: !profileId, // Only persist a new profile if we do not have an existing profileId
         baseProfileId: profileId,
       },
     });
