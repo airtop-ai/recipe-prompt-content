@@ -73,6 +73,9 @@ Report your results using the JSON schema below.
 
 async function run() {
   try {
+    if (!AIRTOP_API_KEY) {
+      throw new Error('AIRTOP_API_KEY is not set');
+    }
     const client = new AirtopClient({
       apiKey: AIRTOP_API_KEY,
     });
