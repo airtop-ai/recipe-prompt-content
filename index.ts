@@ -1,5 +1,4 @@
 import 'dotenv/config';
-import puppeteer, { Browser, Page } from 'puppeteer';
 import { AirtopClient, AirtopError } from '@airtop/sdk';
 import chalk from 'chalk';
 
@@ -102,26 +101,15 @@ async function run() {
       throw new Error('Unable to get cdp url');
     }
 
-    // Connect to the browser
-    const cdpUrl = createSessionResponse.data.cdpWsUrl;
-    const browser: Browser = await puppeteer.connect({
-      browserWSEndpoint: cdpUrl,
-      headers: {
-        Authorization: `Bearer ${AIRTOP_API_KEY}` || '',
-      },
+    // Create a new window and navigate to the URL
+    const windowResponse = await client.windows.create(
+      session.id,
+      { url: LOGIN_URL }
+    );
+    
+    const windowInfo = await client.windows.getWindowInfo(session.id, windowResponse.data.windowId, {
+      disableResize: true, // Prevents the browser window from being resized when loading a live view, which might impact the agent's ability to scrape or summarize content
     });
-    console.log('Connected to browser');
-
-    // Open a new page
-    const page: Page = await browser.newPage();
-
-    console.log('Navigating to Glassdoor profile');
-    await page.goto(LOGIN_URL);
-    const windowInfo = await client.windows.getWindowInfoForPuppeteerPage(session, page, {
-    // By default, Airtop resizes a live view to match the user's local browser window size.
-    // This might affect Airtop's scraping mechanism, so we disable that behavior here.
-      disableResize: true,
-    }); 
 
     // Check whether the user is logged in
     console.log('Determining whether the user is logged in...');
@@ -145,7 +133,7 @@ async function run() {
 
     // Navigate to the target URL
     console.log('Navigating to target url');
-    await page.goto(TARGET_URL);
+    await client.windows.loadUrl(session.id, windowInfo.data.windowId, { url: TARGET_URL });
     console.log('Prompting the AI agent, waiting for a response (this may take a few minutes)...');
     const promptContentResponse = await client.windows.promptContent(session.id, windowInfo.data.windowId, {
       prompt: EXTRACT_DATA_PROMPT,
@@ -155,7 +143,6 @@ async function run() {
     console.log('Response:\n\n', chalk.green(formattedJson));
 
     // Clean up
-    await browser.close();
     await client.sessions.terminate(session.id);
     console.log(chalk.red('\nSession terminated'));
     process.exit(0);
