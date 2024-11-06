@@ -107,9 +107,7 @@ async function run() {
       { url: LOGIN_URL }
     );
     
-    const windowInfo = await client.windows.getWindowInfo(session.id, windowResponse.data.windowId, {
-      disableResize: true, // Prevents the browser window from being resized when loading a live view, which might impact the agent's ability to scrape or summarize content
-    });
+    const windowInfo = await client.windows.getWindowInfo(session.id, windowResponse.data.windowId);
 
     // Check whether the user is logged in
     console.log('Determining whether the user is logged in...');
@@ -142,7 +140,8 @@ async function run() {
     const formattedJson = JSON.stringify(JSON.parse(promptContentResponse.data.modelResponse), null, 2);
     console.log('Response:\n\n', chalk.green(formattedJson));
 
-    // Clean up
+    // Clean up. Comment out the next two lines if you want to access the live view after the script completes.
+    await client.windows.close(session.id, windowInfo.data.windowId);
     await client.sessions.terminate(session.id);
     console.log(chalk.red('\nSession terminated'));
     process.exit(0);
