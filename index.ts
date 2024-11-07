@@ -4,71 +4,68 @@ import chalk from 'chalk';
 
 const AIRTOP_API_KEY = process.env.AIRTOP_API_KEY;
 const LOGIN_URL = 'https://www.glassdoor.com/member/profile';
-const IS_LOGGED_IN_PROMPT = `This browser is open to a page that either display's a user's Glassdoor profile or prompts the user to login.  Please give me a JSON response matching the schema below.
-
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "isLoggedIn": {
-      "type": "boolean",
-      "description": "Use this field to indicate whether the user is logged in."
-    },
-    "error": {
-      "type": "string",
-      "description": "If you cannot fulfill the request, use this field to report the problem."
-    }
-  }
-}
-`;
+const IS_LOGGED_IN_PROMPT = `This browser is open to a page that either display's a user's Glassdoor profile or prompts the user to login.  Please give me a JSON response matching the schema below.`;
+const IS_LOGGED_IN_OUTPUT_SCHEMA = {
+	$schema: "http://json-schema.org/draft-07/schema#",
+	type: "object",
+	properties: {
+		isLoggedIn: {
+			type: "boolean",
+			description: "Use this field to indicate whether the user is logged in.",
+		},
+		error: {
+			type: "string",
+			description:
+				"If you cannot fulfill the request, use this field to report the problem.",
+		},
+	},
+};
 const TARGET_URL = 'https://www.glassdoor.com/Job/san-francisco-ca-software-engineer-jobs-SRCH_IL.0,16_IC1147401_KO17,34.htm'; // A search for software engineer jobs on Glassdoor
-const EXTRACT_DATA_PROMPT = `This browser is open to a page that lists available job roles for software engineers in San Francisco. Please provide 10 job roles that appear to be posted by the AI-related companies.
+const EXTRACT_DATA_PROMPT = `This browser is open to a page that lists available job roles for software engineers in San Francisco. Please provide 10 job roles that appear to be posted by the AI-related companies.`;
 
-Report your results using the JSON schema below.
-
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "companies": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "companyName": {
-            "type": "string"
-          },
-          jobTitle: {
-            "type": "string"
-          },
-          "location": {
-            "type": "string"
-          },
-          "salary": {
-            "type": "object",
-            "properties": {
-              "min": {
-                "type": "number",
-                "minimum": 0
-              },
-              "max": {
-                "type": "number",
-                "minimum": 0
-              }
-            },
-            "required": ["min", "max"]
-          }
-        },
-        "required": ["companyName", "jobTitle", "location", "salary"]
-      }
-    },
-    "error": {
-      "type": "string",
-      "description": "If you cannot fulfill the request, use this field to report the problem."
-    }
-  }
-}
-`;
+const EXTRACT_DATA_OUTPUT_SCHEMA = {
+	$schema: "http://json-schema.org/draft-07/schema#",
+	type: "object",
+	properties: {
+		companies: {
+			type: "array",
+			items: {
+				type: "object",
+				properties: {
+					companyName: {
+						type: "string",
+					},
+					jobTitle: {
+						type: "string",
+					},
+					location: {
+						type: "string",
+					},
+					salary: {
+						type: "object",
+						properties: {
+							min: {
+								type: "number",
+								minimum: 0,
+							},
+							max: {
+								type: "number",
+								minimum: 0,
+							},
+						},
+						required: ["min", "max"],
+					},
+				},
+				required: ["companyName", "jobTitle", "location", "salary"],
+			},
+		},
+		error: {
+			type: "string",
+			description:
+				"If you cannot fulfill the request, use this field to report the problem.",
+		},
+	},
+};
 
 async function run() {
   try {
@@ -111,8 +108,11 @@ async function run() {
 
     // Check whether the user is logged in
     console.log('Determining whether the user is logged in...');
-    const isLoggedInPromptResponse = await client.windows.promptContent(session.id, windowInfo.data.windowId, {
+    const isLoggedInPromptResponse = await client.windows.pageQuery(session.id, windowInfo.data.windowId, {
       prompt: IS_LOGGED_IN_PROMPT,
+      configuration: {
+        outputSchema: IS_LOGGED_IN_OUTPUT_SCHEMA,
+      },
     });
     const parsedResponse = JSON.parse(isLoggedInPromptResponse.data.modelResponse);
     if (parsedResponse.error) {
@@ -133,9 +133,12 @@ async function run() {
     console.log('Navigating to target url');
     await client.windows.loadUrl(session.id, windowInfo.data.windowId, { url: TARGET_URL });
     console.log('Prompting the AI agent, waiting for a response (this may take a few minutes)...');
-    const promptContentResponse = await client.windows.promptContent(session.id, windowInfo.data.windowId, {
+    const promptContentResponse = await client.windows.pageQuery(session.id, windowInfo.data.windowId, {
       prompt: EXTRACT_DATA_PROMPT,
       followPaginationLinks: true, // This will tell the agent to load additional results via pagination links or scrolling
+      configuration: {
+        outputSchema: EXTRACT_DATA_OUTPUT_SCHEMA,
+      },
     });
     const formattedJson = JSON.stringify(JSON.parse(promptContentResponse.data.modelResponse), null, 2);
     console.log('Response:\n\n', chalk.green(formattedJson));
