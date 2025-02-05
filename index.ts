@@ -78,7 +78,8 @@ async function run() {
 
     // Learn more about profiles here: https://docs.airtop.ai/guides/how-to/saving-a-profile
     const profileName: string | undefined = await new Promise<string | undefined>((resolve) => {
-      process.stdout.write('Enter a profile name (or press Enter to skip): ');
+      process.stdout.write('If you want to store your credentials for subsequent runs, enter a profile name to use (or press Enter to skip).\n');
+      process.stdout.write('Profile name: ');
       process.stdin.once('data', (input) => {
         const trimmedInput = input.toString().trim();
         resolve(trimmedInput || undefined);
