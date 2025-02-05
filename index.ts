@@ -21,7 +21,7 @@ const IS_LOGGED_IN_OUTPUT_SCHEMA = {
 	},
 };
 const TARGET_URL = 'https://www.glassdoor.com/Job/san-francisco-ca-software-engineer-jobs-SRCH_IL.0,16_IC1147401_KO17,34.htm'; // A search for software engineer jobs on Glassdoor
-const EXTRACT_DATA_PROMPT = `This browser is open to a page that lists available job roles for software engineers in San Francisco. Please provide 10 job roles that appear to be posted by the AI-related companies.`;
+const EXTRACT_DATA_PROMPT = "This browser is open to a page that lists available job roles for software engineers in San Francisco. Please provide 10 job roles that appear to be posted by the AI-related companies.";
 
 const EXTRACT_DATA_OUTPUT_SCHEMA = {
 	$schema: "http://json-schema.org/draft-07/schema#",
@@ -75,19 +75,20 @@ async function run() {
     const client = new AirtopClient({
       apiKey: AIRTOP_API_KEY,
     });
-    const profileId: string | undefined = await new Promise<string | undefined>((resolve) => {
-      process.stdout.write('Enter a profileId (or press Enter to skip): ');
+
+    // Learn more about profiles here: https://docs.airtop.ai/guides/how-to/saving-a-profile
+    const profileName: string | undefined = await new Promise<string | undefined>((resolve) => {
+      process.stdout.write('Enter a profile name (or press Enter to skip): ');
       process.stdin.once('data', (input) => {
         const trimmedInput = input.toString().trim();
         resolve(trimmedInput || undefined);
-        console.log(trimmedInput ? `Using profileId: ${trimmedInput}` : 'No profileId provided');
+        console.log(trimmedInput ? `Using profile name: ${trimmedInput}` : 'No profile name provided');
       });
     });
     const createSessionResponse = await client.sessions.create({
       configuration: {
         timeoutMinutes: 10,
-        persistProfile: !profileId, // Only persist a new profile if we do not have an existing profileId
-        baseProfileId: profileId,
+        profileName,
       },
     });
 
@@ -96,6 +97,11 @@ async function run() {
 
     if (!createSessionResponse.data.cdpWsUrl) {
       throw new Error('Unable to get cdp url');
+    }
+
+    if (profileName) {
+      console.log(chalk.blue(`Profile: "${profileName}" will be saved on session termination.`));
+      await client.sessions.saveProfileOnTermination(session.id, profileName);
     }
 
     // Create a new window and navigate to the URL
@@ -124,7 +130,9 @@ async function run() {
     if (!isUserLoggedIn) {
       console.log('Log into your Glassdoor account on the live view of your browser window.  Press `Enter` once you have logged in.', chalk.blueBright(windowInfo.data.liveViewUrl));
       await new Promise<void>(resolve => process.stdin.once('data', () => resolve()));
-      console.log('To avoid logging in again, use the following profileId the next time you run this script: ', chalk.green(session.profileId));
+      if (profileName) {
+        console.log(chalk.blue(`To avoid logging in again, use the profile "${profileName}" next time you run this script.`));
+      }
     } else {
       console.log('User is already logged in. View progress at the following live view URL:', chalk.blueBright(windowInfo.data.liveViewUrl));
     }
